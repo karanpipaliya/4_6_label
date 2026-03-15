@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF to 4x6 - Simple Version</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .upload-section {
+            text-align: center;
+            padding: 40px;
+            border: 3px dashed #2a5298;
+            border-radius: 10px;
+            margin: 20px 0;
+            transition: all 0.3s;
+            background: #f9f9f9;
+        }
+
+        .upload-section.dragover {
+            border-color: #48bb78;
+            background: #f0fff4;
+            transform: scale(1.02);
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-btn {
+            background: #2a5298;
+            color: white;
+            padding: 15px 40px;
+            border-radius: 25px;
+            cursor: pointer;
+            display: inline-block;
+            font-size: 1.2em;
+            transition: all 0.3s;
+            border: none;
+            margin: 10px;
+            font-weight: bold;
+        }
+
+        .upload-btn:hover {
+            background: #1e3c72;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(42, 82, 152, 0.4);
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 15px 40px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1.1em;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+
+        .btn-primary {
+            background: #2a5298;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #1e3c72;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(42, 82, 152, 0.4);
+        }
+
+        .btn-success {
+            background: #48bb78;
+            color: white;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background: #38a169;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(72, 187, 120, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.98);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .loading-spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #2a5298;
+            border-radius: 50%;
+            width: 70px;
+            height: 70px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 25px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .progress-bar {
+            width: 450px;
+            height: 25px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 15px 0;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #2a5298, #48bb78);
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 15px;
+        }
+
+        .message-box {
+            padding: 15px 25px;
+            border-radius: 10px;
+            margin: 10px 0;
+            display: none;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .message-box.error {
+            background: #fee;
+            color: #c33;
+            border: 1px solid #c33;
+            display: block;
+        }
+
+        .message-box.success {
+            background: #e3ffe3;
+            color: #2a5298;
+            border: 1px solid #2a5298;
+            display: block;
+        }
+
+        .preview-section {
+            margin-top: 30px;
+        }
+
+        .sheets-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+            margin-top: 20px;
+        }
+
+        .sheet-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            border: 1px solid #e0e0e0;
+        }
+
+        .sheet-card h3 {
+            color: #2a5298;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #2a5298;
+            text-align: center;
+        }
+
+        .sheet-image-container {
+            position: relative;
+            background: #f5f5f5;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .sheet-image {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .page-marker {
+            position: absolute;
+            background: rgba(42, 82, 152, 0.9);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+
+        .top-marker {
+            top: 10px;
+            left: 10px;
+        }
+
+        .bottom-marker {
+            bottom: 10px;
+            left: 10px;
+        }
+
+        .quality-badge-small {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #00b09b;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-size: 0.7em;
+            font-weight: bold;
+        }
+
+        .download-progress {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff3cd;
+            border-radius: 10px;
+            border-left: 5px solid #ffc107;
+            display: none;
+        }
+
+        .download-progress.active {
+            display: block;
+        }
+
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin: 20px 0;
+            padding: 0 20px;
+        }
+
+        .step {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            background: #f0f0f0;
+            margin: 0 5px;
+            border-radius: 10px;
+            font-weight: bold;
+            color: #666;
+        }
+
+        .step.active {
+            background: #2a5298;
+            color: white;
+        }
+
+        .step.completed {
+            background: #48bb78;
+            color: white;
+        }
+
+        .download-status {
+            background: #f0f7ff;
+            padding: 20px 30px;
+            border-radius: 15px;
+            text-align: center;
+            margin-top: 20px;
+            border: 2px solid #2a5298;
+        }
+
+        .status-timer {
+            font-size: 2em;
+            font-weight: bold;
+            color: #2a5298;
+            margin: 10px 0;
+        }
+
+        .status-text {
+            font-size: 1.2em;
+            color: #333;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📄 PDF TO 4x6 CARDS</h1>
+
+        <div class="upload-section" id="dropZone">
+            <input type="file" id="fileInput" class="file-input" accept=".pdf" />
+            <label for="fileInput" class="upload-btn">📤 SELECT PDF FILE</label>
+            <p style="margin-top: 15px; color: #666;">Drag & Drop or Click to Upload</p>
+        </div>
+
+        <div id="messageArea"></div>
+
+        <div class="controls">
+            <button class="btn btn-primary" id="processBtn" disabled>⚡ PROCESS PDF</button>
+            <button class="btn btn-success" id="downloadBtn" disabled>📥 DOWNLOAD 4x6 PDF</button>
+            <button class="btn btn-primary" id="resetBtn">🔄 RESET</button>
+        </div>
+
+        <!-- Download Progress Tracker -->
+        <div class="download-progress" id="downloadProgress">
+            <h3 style="color: #2a5298; margin-bottom: 15px;">📊 DOWNLOAD STATUS</h3>
+            
+            <div class="step-indicator">
+                <div class="step" id="step1">⏳ Initializing</div>
+                <div class="step" id="step2">⏳ Processing</div>
+                <div class="step" id="step3">⏳ Generating</div>
+                <div class="step" id="step4">⏳ Downloading</div>
+            </div>
+
+            <div class="download-status">
+                <div class="status-text" id="statusMessage">Preparing download...</div>
+                <div class="status-timer" id="timer">00:00</div>
+                
+                <div class="progress-bar" style="width: 100%; margin-top: 20px;">
+                    <div class="progress-fill" id="downloadProgressFill" style="width: 0%;"></div>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 0.9em; color: #666;">
+                    <span id="currentAction">Initializing...</span>
+                    <span id="timeElapsed">0s elapsed</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="preview-section" id="previewSection" style="display: none;">
+            <h2 style="color: #2a5298; text-align: center;">📸 PREVIEW - 4x6 SHEETS</h2>
+            <div class="sheets-grid" id="sheetsGrid"></div>
+        </div>
+    </div>
+
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <h3 id="loadingTitle">Processing...</h3>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <p id="loadingStatus"></p>
+    </div>
+
+    <!-- Load libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <script>
+        window.addEventListener('load', function() {
+            'use strict';
+
+            if (typeof pdfjsLib === 'undefined') {
+                showMessage('PDF library failed to load. Please refresh.', 'error');
+                return;
+            }
+
+            if (typeof jspdf === 'undefined' && typeof window.jspdf === 'undefined') {
+                showMessage('jsPDF library failed to load. Please refresh.', 'error');
+                return;
+            }
+
+            const { jsPDF } = window.jspdf || { jsPDF: window.jspdf };
+
+            const CONFIG = {
+                DPI: 300,
+                SHEET_WIDTH_INCH: 4,
+                SHEET_HEIGHT_INCH: 6,
+                PADDING_MM: 0,
+                ROTATION: 90
+            };
+
+            const SHEET_WIDTH_PX = CONFIG.SHEET_WIDTH_INCH * CONFIG.DPI;
+            const SHEET_HEIGHT_PX = CONFIG.SHEET_HEIGHT_INCH * CONFIG.DPI;
+            const AVAILABLE_WIDTH = SHEET_WIDTH_PX;
+            const AVAILABLE_HEIGHT = SHEET_HEIGHT_PX;
+            const HALF_HEIGHT = AVAILABLE_HEIGHT / 2;
+
+            let pdfDoc = null;
+            let processedSheets = [];
+            
+            // DOM elements
+            const dropZone = document.getElementById('dropZone');
+            const fileInput = document.getElementById('fileInput');
+            const processBtn = document.getElementById('processBtn');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const previewSection = document.getElementById('previewSection');
+            const sheetsGrid = document.getElementById('sheetsGrid');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const loadingTitle = document.getElementById('loadingTitle');
+            const loadingStatus = document.getElementById('loadingStatus');
+            const progressFill = document.getElementById('progressFill');
+            const messageArea = document.getElementById('messageArea');
+            
+            // Download progress elements
+            const downloadProgress = document.getElementById('downloadProgress');
+            const statusMessage = document.getElementById('statusMessage');
+            const timer = document.getElementById('timer');
+            const downloadProgressFill = document.getElementById('downloadProgressFill');
+            const currentAction = document.getElementById('currentAction');
+            const timeElapsed = document.getElementById('timeElapsed');
+            const step1 = document.getElementById('step1');
+            const step2 = document.getElementById('step2');
+            const step3 = document.getElementById('step3');
+            const step4 = document.getElementById('step4');
+
+            let timerInterval = null;
+            let startTime = null;
+
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+            // Drag & drop events
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, preventDefaults, false);
+            });
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+            });
+
+            dropZone.addEventListener('drop', handleDrop, false);
+            fileInput.addEventListener('change', handleFileSelect);
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            function handleDrop(e) {
+                const files = e.dataTransfer.files;
+                handleFiles(files);
+            }
+
+            function handleFileSelect(e) {
+                const files = e.target.files;
+                handleFiles(files);
+            }
+
+            function handleFiles(files) {
+                if (files.length === 0) return;
+                
+                const file = files[0];
+                
+                if (file.type !== 'application/pdf') {
+                    showMessage('Please select a valid PDF file', 'error');
+                    return;
+                }
+                
+                if (file.size > 200 * 1024 * 1024) {
+                    showMessage('File too large. Maximum 200MB', 'error');
+                    return;
+                }
+                
+                loadPDF(file);
+            }
+
+            async function loadPDF(file) {
+                try {
+                    showLoading('Loading PDF...', 'Reading file...', 10);
+                    
+                    const arrayBuffer = await readFileAsArrayBuffer(file);
+                    
+                    const loadingTask = pdfjsLib.getDocument({ 
+                        data: arrayBuffer,
+                        cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/cmaps/',
+                        cMapPacked: true,
+                    });
+                    
+                    loadingTask.onProgress = (progress) => {
+                        const percent = Math.round((progress.loaded / progress.total) * 40);
+                        updateLoading(percent, 'Loading PDF...');
+                    };
+                    
+                    pdfDoc = await loadingTask.promise;
+                    
+                    if (pdfDoc.numPages > 100) {
+                        showMessage('PDF has more than 100 pages. Please use a smaller file.', 'error');
+                        hideLoading();
+                        return;
+                    }
+                    
+                    showMessage(`✅ PDF loaded: ${pdfDoc.numPages} pages`, 'success');
+                    processBtn.disabled = false;
+                    hideLoading();
+                    
+                } catch (err) {
+                    console.error(err);
+                    showMessage('Error loading PDF: ' + err.message, 'error');
+                    hideLoading();
+                }
+            }
+
+            function readFileAsArrayBuffer(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsArrayBuffer(file);
+                });
+            }
+
+            processBtn.addEventListener('click', async () => {
+                if (!pdfDoc) return;
+                
+                try {
+                    showLoading('Processing PDF...', 'Starting...', 0);
+                    
+                    processedSheets = [];
+                    
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d', { 
+                        alpha: false,
+                        antialias: false,
+                        depth: 24,
+                        desynchronized: true
+                    });
+                    
+                    canvas.width = SHEET_WIDTH_PX;
+                    canvas.height = SHEET_HEIGHT_PX;
+                    
+                    const totalSheets = Math.ceil(pdfDoc.numPages / 2);
+                    
+                    for (let i = 1; i <= pdfDoc.numPages; i += 2) {
+                        const sheetIndex = Math.floor((i - 1) / 2) + 1;
+                        const progress = (sheetIndex / totalSheets) * 100;
+                        
+                        updateLoading(
+                            progress,
+                            `Processing sheet ${sheetIndex} of ${totalSheets}`,
+                            `Pages: ${i} ${i+1 <= pdfDoc.numPages ? '& ' + (i+1) : ''}`
+                        );
+                        
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        
+                        if (i <= pdfDoc.numPages) {
+                            await renderPageInArea(ctx, pdfDoc, i, {
+                                x: 0,
+                                y: 0,
+                                width: AVAILABLE_WIDTH,
+                                height: HALF_HEIGHT
+                            });
+                        }
+                        
+                        if (i + 1 <= pdfDoc.numPages) {
+                            await renderPageInArea(ctx, pdfDoc, i + 1, {
+                                x: 0,
+                                y: HALF_HEIGHT,
+                                width: AVAILABLE_WIDTH,
+                                height: HALF_HEIGHT
+                            });
+                        }
+                        
+                        processedSheets.push({
+                            imageData: canvas.toDataURL('image/png'),
+                            topPage: i,
+                            bottomPage: i + 1 <= pdfDoc.numPages ? i + 1 : null
+                        });
+                    }
+                    
+                    displayPreview();
+                    showMessage(`✅ Successfully created ${processedSheets.length} sheets!`, 'success');
+                    downloadBtn.disabled = false;
+                    
+                } catch (err) {
+                    console.error(err);
+                    showMessage('Error processing PDF: ' + err.message, 'error');
+                } finally {
+                    hideLoading();
+                }
+            });
+
+            async function renderPageInArea(ctx, pdfDoc, pageNum, area) {
+                try {
+                    const page = await pdfDoc.getPage(pageNum);
+                    
+                    const viewport = page.getViewport({ scale: 1 });
+                    
+                    const scale = Math.min(
+                        area.width / viewport.height,
+                        area.height / viewport.width
+                    );
+                    
+                    const scaledViewport = page.getViewport({ scale: scale });
+                    
+                    const xPos = area.x + (area.width - scaledViewport.height) / 2;
+                    const yPos = area.y + (area.height - scaledViewport.width) / 2;
+                    
+                    ctx.save();
+                    
+                    ctx.translate(xPos + scaledViewport.height/2, yPos + scaledViewport.width/2);
+                    ctx.rotate(CONFIG.ROTATION * Math.PI / 180);
+                    
+                    await page.render({
+                        canvasContext: ctx,
+                        viewport: scaledViewport,
+                        transform: [1, 0, 0, 1, -scaledViewport.width/2, -scaledViewport.height/2],
+                        background: 'white',
+                        intent: 'print',
+                        renderInteractiveForms: false,
+                        enableWebGL: false
+                    }).promise;
+                    
+                    ctx.restore();
+                    
+                } catch (err) {
+                    console.error(`Error rendering page ${pageNum}:`, err);
+                }
+            }
+
+            function displayPreview() {
+                sheetsGrid.innerHTML = '';
+                
+                processedSheets.forEach((sheet, index) => {
+                    const card = document.createElement('div');
+                    card.className = 'sheet-card';
+                    
+                    card.innerHTML = `
+                        <h3>📄 4x6 SHEET ${index + 1}</h3>
+                        <div class="sheet-image-container">
+                            <img src="${sheet.imageData}" class="sheet-image" alt="Sheet ${index + 1}">
+                            <div class="page-marker top-marker">⬆️ PAGE ${sheet.topPage}</div>
+                            <div class="page-marker bottom-marker">⬇️ ${sheet.bottomPage ? 'PAGE ' + sheet.bottomPage : 'EMPTY'}</div>
+                            <div class="quality-badge-small">PNG LOSSLESS</div>
+                        </div>
+                    `;
+                    
+                    sheetsGrid.appendChild(card);
+                });
+                
+                previewSection.style.display = 'block';
+            }
+
+            function startTimer() {
+                startTime = Date.now();
+                if (timerInterval) clearInterval(timerInterval);
+                
+                timerInterval = setInterval(() => {
+                    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                    const minutes = Math.floor(elapsed / 60);
+                    const seconds = elapsed % 60;
+                    timer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    timeElapsed.textContent = `${elapsed}s elapsed`;
+                }, 1000);
+            }
+
+            function stopTimer() {
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                }
+            }
+
+            function resetSteps() {
+                step1.className = 'step';
+                step2.className = 'step';
+                step3.className = 'step';
+                step4.className = 'step';
+                step1.innerHTML = '⏳ Initializing';
+                step2.innerHTML = '⏳ Processing';
+                step3.innerHTML = '⏳ Generating';
+                step4.innerHTML = '⏳ Downloading';
+            }
+
+            downloadBtn.addEventListener('click', async () => {
+                if (processedSheets.length === 0) return;
+                
+                try {
+                    // Show download progress
+                    downloadProgress.classList.add('active');
+                    resetSteps();
+                    startTimer();
+                    
+                    // Step 1: Initializing
+                    step1.className = 'step active';
+                    step1.innerHTML = '🔄 Initializing';
+                    statusMessage.textContent = 'Initializing download...';
+                    currentAction.textContent = 'Starting...';
+                    downloadProgressFill.style.width = '10%';
+                    
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                    // Step 2: Processing
+                    step1.className = 'step completed';
+                    step1.innerHTML = '✅ Initializing';
+                    step2.className = 'step active';
+                    step2.innerHTML = '🔄 Processing';
+                    statusMessage.textContent = 'Processing sheets...';
+                    currentAction.textContent = 'Converting to PDF...';
+                    downloadProgressFill.style.width = '30%';
+                    
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                    // Step 3: Generating PDF
+                    step2.className = 'step completed';
+                    step2.innerHTML = '✅ Processing';
+                    step3.className = 'step active';
+                    step3.innerHTML = '🔄 Generating PDF';
+                    statusMessage.textContent = 'Generating PDF file...';
+                    currentAction.textContent = 'Adding images to PDF...';
+                    downloadProgressFill.style.width = '60%';
+                    
+                    // Create PDF
+                    const pdf = new jsPDF({
+                        orientation: 'portrait',
+                        unit: 'in',
+                        format: [CONFIG.SHEET_WIDTH_INCH, CONFIG.SHEET_HEIGHT_INCH]
+                    });
+                    
+                    for (let i = 0; i < processedSheets.length; i++) {
+                        const progress = 60 + ((i / processedSheets.length) * 30);
+                        downloadProgressFill.style.width = progress + '%';
+                        currentAction.textContent = `Adding sheet ${i+1} of ${processedSheets.length}`;
+                        
+                        if (i > 0) {
+                            pdf.addPage([CONFIG.SHEET_WIDTH_INCH, CONFIG.SHEET_HEIGHT_INCH], 'portrait');
+                        }
+                        
+                        pdf.addImage(
+                            processedSheets[i].imageData,
+                            'PNG',
+                            0, 0,
+                            CONFIG.SHEET_WIDTH_INCH,
+                            CONFIG.SHEET_HEIGHT_INCH,
+                            undefined,
+                            'FAST'
+                        );
+                    }
+                    
+                    // Step 4: Downloading
+                    step3.className = 'step completed';
+                    step3.innerHTML = '✅ Generating PDF';
+                    step4.className = 'step active';
+                    step4.innerHTML = '🔄 Downloading';
+                    statusMessage.textContent = 'Downloading...';
+                    currentAction.textContent = 'Saving PDF...';
+                    downloadProgressFill.style.width = '100%';
+                    
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                    // Save PDF with simple name
+                    pdf.save('4x6_cards.pdf');
+                    
+                    // Complete
+                    step4.className = 'step completed';
+                    step4.innerHTML = '✅ Downloading';
+                    statusMessage.textContent = 'Download complete!';
+                    currentAction.textContent = 'Done';
+                    
+                    stopTimer();
+                    showMessage('✅ PDF downloaded successfully!', 'success');
+                    
+                    // Hide progress after 3 seconds
+                    setTimeout(() => {
+                        downloadProgress.classList.remove('active');
+                    }, 3000);
+                    
+                } catch (err) {
+                    console.error(err);
+                    showMessage('Error creating PDF: ' + err.message, 'error');
+                    downloadProgress.classList.remove('active');
+                    stopTimer();
+                }
+            });
+
+            resetBtn.addEventListener('click', () => {
+                pdfDoc = null;
+                processedSheets = [];
+                previewSection.style.display = 'none';
+                fileInput.value = '';
+                sheetsGrid.innerHTML = '';
+                processBtn.disabled = true;
+                downloadBtn.disabled = true;
+                downloadProgress.classList.remove('active');
+                stopTimer();
+                showMessage('✅ Reset complete. Ready for new PDF.', 'success');
+            });
+
+            function showLoading(title, status, progress) {
+                loadingTitle.textContent = title || 'Processing...';
+                loadingStatus.textContent = status || '';
+                progressFill.style.width = (progress || 0) + '%';
+                loadingOverlay.classList.add('active');
+            }
+
+            function updateLoading(progress, title, status) {
+                progressFill.style.width = progress + '%';
+                if (title) loadingTitle.textContent = title;
+                if (status) loadingStatus.textContent = status;
+            }
+
+            function hideLoading() {
+                loadingOverlay.classList.remove('active');
+            }
+
+            function showMessage(text, type) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message-box ${type}`;
+                messageDiv.textContent = text;
+                
+                messageArea.innerHTML = '';
+                messageArea.appendChild(messageDiv);
+                
+                setTimeout(() => {
+                    if (messageDiv.parentNode) {
+                        messageDiv.remove();
+                    }
+                }, 5000);
+            }
+        });
+    </script>
+</body>
+</html>
